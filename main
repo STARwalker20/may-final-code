@@ -1,0 +1,136 @@
+import pygame
+
+from pygame import mixer
+mixer.init()
+pygame.init()
+pygame.display.set_caption("may final")
+screen = pygame.display.set_mode((800,600))
+clock = pygame.time.Clock()
+
+star1 = pygame.image.load('star1.png')
+framewidth = 50
+frameheight = 50
+xpos = 0
+ypos = 0
+mousePos = (xpos, ypos)
+state = 1
+button1 = False
+mouseDown = False
+NOTE_SPACING = 100 # pixels, space from one note to the next
+
+BASELINE_Y = 300 # pixels, visual judgement line position
+
+OFFSET = 0 # ms, higher values make notes come later
+
+KEY_SIZE = (50, 20)
+KEY_DISTANCE = 100 # horizontal distance from corner of one key to corner of next
+
+
+class Key():
+    def __init__(self,x,y,color1, color2,key):
+        self.color1 = color1
+        self.color2 = color2
+        self.key = key
+        self.rect = pygame.Rect((x, y), KEY_SIZE)
+        self.handled = False
+
+keys =[
+    Key(300, BASELINE_Y, (255,0,0), (220,0,0),  pygame.K_a),
+    Key(400, BASELINE_Y, (0,255,0), (0,220,0), pygame.K_s),
+    Key(500, BASELINE_Y, (0,0,255), (100,100,220), pygame.K_d),
+    Key(600, BASELINE_Y, (255,255,0), (200,200,200), pygame.K_f)
+]
+
+
+
+def load(map: str) -> tuple[int, list[tuple[int, int]]]:
+    '''Loads the song and beatmap with the name from `map`. Don't include the file extention (.mp3, .txt).
+    Returns two values in a tuple: the first one is the BPM fo the song, the second is a list of (x, y) values for each note.
+    '''
+
+    notes: list[tuple[int, int]] = []
+    mixer.music.load(map +".mp3")
+    mixer.music.play()
+    print(pygame.mixer.music.get_pos())
+    f = open(map +".txt","r")
+    bpm = int(f.readline())
+    data = f.readlines()
+    for y in range(len(data)):
+            for x in range(len(data[y])):
+                if data[y][x] == '0':
+                    notes.append((x, y))
+    for y in range(len(data)):
+         for x in range(len(data[y])):
+              if data[y][x] == '1':
+                   notes.append((x,y))
+
+    return bpm, notes
+
+
+bpm, map = load("tell your world")
+ms_per_beat = (60 * 1000) / bpm
+
+
+while True:
+    screen.fill((0,0,0))
+    clock.tick(60)
+
+    beat_num = (mixer.music.get_pos() - OFFSET) / ms_per_beat
+    print(beat_num)
+
+    #input section=========================================
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            quit()
+     #keeps track of mouse position
+        if event.type == pygame.MOUSEMOTION:
+                mousePos = event.pos
+            #keeps track of mouse button
+        if event.type == pygame.MOUSEBUTTONDOWN:
+                mouseDown = True
+        if event.type == pygame.MOUSEBUTTONUP:
+                mouseDown = False
+
+    for key in keys:
+        pygame.draw.rect(screen,key.color1,key.rect)
+ 
+    pressed = pygame.key.get_pressed()
+    for key in keys:
+        if pressed[key.key]:
+            pygame.draw.rect(screen,key.color1,key.rect)
+            key.handled = False
+        if not pressed[key.key]:
+            pygame.draw.rect(screen,key.color2,key.rect)
+            key.handled = True
+
+    for note in map:
+        x, y = note
+        note_rect = pygame.Rect(
+            (
+                keys[x].rect.x, # use x coordinate from that row's key rect
+                (y * -NOTE_SPACING) + (beat_num * NOTE_SPACING) + BASELINE_Y, # screen position based on current beat number
+            ),
+            KEY_SIZE
+        )
+        note_rect1 = pygame.Rect(
+            (
+                keys[x].rect.x, # use x coordinate from that row's key rect
+                (y * -NOTE_SPACING) + (beat_num * NOTE_SPACING) + BASELINE_Y, # screen position based on current beat number
+            ),
+            KEY_SIZE
+        )
+        pygame.draw.rect(screen,(200,0,0), note_rect)   
+        pygame.draw.rect(screen,(0,200,0), note_rect1) 
+        for key in keys:
+            if key.rect.colliderect(note_rect) and not key.handled:
+                map.remove(note)
+                key.handled = True
+                break
+        for key in keys:
+             if key.rect.colliderect(note_rect1) and not key.handled:
+                  map.remove(note)
+                  key.handled= True
+                  break
+
+    pygame.display.update()
